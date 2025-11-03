@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { RotateCcw, ZoomIn, ZoomOut, Move, Palette, Download, Share } from 'lucide-react';
 import Scene3D from './Scene3D';
+import FurnitureLibrary from './FurnitureLibrary';
 
 interface DesignViewerProps {
   blueprint?: string | null;
@@ -10,6 +11,7 @@ interface DesignViewerProps {
 const DesignViewer: React.FC<DesignViewerProps> = ({ blueprint, design }) => {
   const [selectedRoom, setSelectedRoom] = useState('living-room');
   const [viewMode, setViewMode] = useState('3d');
+  const [selectedFurniture, setSelectedFurniture] = useState<any>(null);
 
   const rooms = [
     { id: 'living-room', name: 'Living Room', image: 'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg' },
@@ -69,7 +71,7 @@ const DesignViewer: React.FC<DesignViewerProps> = ({ blueprint, design }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Room Selection Sidebar */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 space-y-6">
           <div className="bg-white rounded-xl p-6 shadow-lg">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Rooms</h3>
             <div className="space-y-3">
@@ -93,6 +95,11 @@ const DesignViewer: React.FC<DesignViewerProps> = ({ blueprint, design }) => {
               ))}
             </div>
           </div>
+          
+          <FurnitureLibrary 
+            selectedRoom={selectedRoom}
+            onFurnitureSelect={setSelectedFurniture}
+          />
         </div>
 
         {/* 3D Viewer */}
@@ -141,6 +148,13 @@ const DesignViewer: React.FC<DesignViewerProps> = ({ blueprint, design }) => {
                 {/* Furniture List */}
                 <div>
                   <h4 className="font-semibold text-gray-800 mb-3">Furniture & Decor</h4>
+                  {selectedFurniture && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-800">
+                        <strong>Selected:</strong> {selectedFurniture.name} - ${selectedFurniture.price}
+                      </p>
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {['Modern Sectional Sofa', 'Glass Coffee Table', 'Floor Lamp', 'Wall Art Set', 'Area Rug', 'Side Tables'].map((item, index) => (
                       <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
