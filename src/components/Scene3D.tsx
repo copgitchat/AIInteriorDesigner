@@ -215,25 +215,94 @@ const Scene3D: React.FC<Scene3DProps> = ({ selectedRoom, onObjectClick }) => {
     const roomHeight = 3;
     const roomDepth = 6;
 
+    // Create texture loader
+    const textureLoader = new THREE.TextureLoader();
+
     // Floor
     const floorGeometry = new THREE.PlaneGeometry(roomWidth, roomDepth);
-    const floorMaterial = new THREE.MeshLambertMaterial({ 
-      color: roomType === 'living-room' ? 0xd4af37 : 
-             roomType === 'bedroom' ? 0xf5deb3 : 
-             roomType === 'kitchen' ? 0xe6e6fa : 0xf0f8ff 
+    
+    // Create procedural floor texture
+    const floorCanvas = document.createElement('canvas');
+    floorCanvas.width = 512;
+    floorCanvas.height = 512;
+    const floorCtx = floorCanvas.getContext('2d')!;
+    
+    // Different floor patterns for different rooms
+    if (roomType === 'living-room') {
+      // Hardwood pattern
+      floorCtx.fillStyle = '#8B4513';
+      floorCtx.fillRect(0, 0, 512, 512);
+      for (let i = 0; i < 512; i += 64) {
+        floorCtx.fillStyle = i % 128 === 0 ? '#A0522D' : '#8B4513';
+        floorCtx.fillRect(0, i, 512, 32);
+      }
+    } else if (roomType === 'kitchen' || roomType === 'bathroom') {
+      // Tile pattern
+      floorCtx.fillStyle = '#F5F5F5';
+      floorCtx.fillRect(0, 0, 512, 512);
+      floorCtx.strokeStyle = '#CCCCCC';
+      floorCtx.lineWidth = 2;
+      for (let x = 0; x < 512; x += 64) {
+        for (let y = 0; y < 512; y += 64) {
+          floorCtx.strokeRect(x, y, 64, 64);
+        }
+      }
+    } else {
+      // Carpet pattern for bedroom
+      floorCtx.fillStyle = '#DEB887';
+      floorCtx.fillRect(0, 0, 512, 512);
+      // Add subtle texture
+      for (let i = 0; i < 1000; i++) {
+        floorCtx.fillStyle = `rgba(${139 + Math.random() * 40}, ${69 + Math.random() * 40}, ${19 + Math.random() * 40}, 0.3)`;
+        floorCtx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
+      }
+    }
+    
+    const floorTexture = new THREE.CanvasTexture(floorCanvas);
+    floorTexture.wrapS = THREE.RepeatWrapping;
+    floorTexture.wrapT = THREE.RepeatWrapping;
+    floorTexture.repeat.set(2, 2);
+    
+    const floorMaterial = new THREE.MeshPhongMaterial({ 
+      map: floorTexture,
+      shininess: roomType === 'kitchen' || roomType === 'bathroom' ? 80 : 10
     });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
 
-    // Walls
-    const wallMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    // Create wall texture
+    const wallCanvas = document.createElement('canvas');
+    wallCanvas.width = 512;
+    wallCanvas.height = 512;
+    const wallCtx = wallCanvas.getContext('2d')!;
+    
+    // Paint texture with subtle variations
+    wallCtx.fillStyle = '#F8F8FF';
+    wallCtx.fillRect(0, 0, 512, 512);
+    
+    // Add subtle texture and imperfections
+    for (let i = 0; i < 500; i++) {
+      wallCtx.fillStyle = `rgba(240, 240, 250, ${0.1 + Math.random() * 0.2})`;
+      wallCtx.fillRect(Math.random() * 512, Math.random() * 512, 3, 3);
+    }
+    
+    const wallTexture = new THREE.CanvasTexture(wallCanvas);
+    wallTexture.wrapS = THREE.RepeatWrapping;
+    wallTexture.wrapT = THREE.RepeatWrapping;
+    wallTexture.repeat.set(1, 1);
+    
+    const wallMaterial = new THREE.MeshPhongMaterial({ 
+      map: wallTexture,
+      shininess: 5
+    });
     
     // Back wall
     const backWallGeometry = new THREE.PlaneGeometry(roomWidth, roomHeight);
     const backWall = new THREE.Mesh(backWallGeometry, wallMaterial);
     backWall.position.set(0, roomHeight / 2, -roomDepth / 2);
+    backWall.receiveShadow = true;
     scene.add(backWall);
 
     // Left wall
@@ -241,18 +310,221 @@ const Scene3D: React.FC<Scene3DProps> = ({ selectedRoom, onObjectClick }) => {
     const leftWall = new THREE.Mesh(leftWallGeometry, wallMaterial);
     leftWall.position.set(-roomWidth / 2, roomHeight / 2, 0);
     leftWall.rotation.y = Math.PI / 2;
+    leftWall.receiveShadow = true;
     scene.add(leftWall);
 
     // Right wall
     const rightWall = new THREE.Mesh(leftWallGeometry, wallMaterial);
     rightWall.position.set(roomWidth / 2, roomHeight / 2, 0);
     rightWall.rotation.y = -Math.PI / 2;
+    rightWall.receiveShadow = true;
     scene.add(rightWall);
 
-    // Add furniture based on room type
-    // Furniture will be added by loadFurnitureModels
+    // Add ceiling
+    const ceilingGeometry = new THREE.PlaneGeometry(roomWidth, roomDepth);
+    const ceilingMaterial = new THREE.MeshPhongMaterial({ 
+      color: 0xFFFFF0,
+      shininess: 10
+    });
+    const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
+    ceiling.rotation.x = Math.PI / 2;
+    ceiling.position.y = roomHeight;
+    ceiling.receiveShadow = true;
+    scene.add(ceiling);
+
+    // Add baseboards
+    const baseboardGeometry = new THREE.BoxGeometry(roomWidth, 0.1, 0.05);
+    const baseboardMaterial = new THREE.MeshPhongMaterial({ color: 0xF5F5DC });
+    
+    const backBaseboard = new THREE.Mesh(baseboardGeometry, baseboardMaterial);
+    backBaseboard.position.set(0, 0.05, -roomDepth / 2 + 0.025);
+    scene.add(backBaseboard);
+    
+    const leftBaseboardGeometry = new THREE.BoxGeometry(0.05, 0.1, roomDepth);
+    const leftBaseboard = new THREE.Mesh(leftBaseboardGeometry, baseboardMaterial);
+    leftBaseboard.position.set(-roomWidth / 2 + 0.025, 0.05, 0);
+    scene.add(leftBaseboard);
+    
+    const rightBaseboard = new THREE.Mesh(leftBaseboardGeometry, baseboardMaterial);
+    rightBaseboard.position.set(roomWidth / 2 - 0.025, 0.05, 0);
+    scene.add(rightBaseboard);
+
+    // Add room-specific environmental elements
+    addEnvironmentalElements(scene, roomType);
   };
 
+  const addEnvironmentalElements = (scene: THREE.Scene, roomType: string) => {
+    switch (roomType) {
+      case 'living-room':
+        addLivingRoomElements(scene);
+        break;
+      case 'bedroom':
+        addBedroomElements(scene);
+        break;
+      case 'kitchen':
+        addKitchenElements(scene);
+        break;
+      case 'bathroom':
+        addBathroomElements(scene);
+        break;
+    }
+  };
+
+  const addLivingRoomElements = (scene: THREE.Scene) => {
+    // Window
+    const windowGeometry = new THREE.PlaneGeometry(2, 1.5);
+    const windowMaterial = new THREE.MeshPhongMaterial({ 
+      color: 0x87CEEB,
+      transparent: true,
+      opacity: 0.3,
+      shininess: 100
+    });
+    const window = new THREE.Mesh(windowGeometry, windowMaterial);
+    window.position.set(2, 1.5, -2.99);
+    scene.add(window);
+    
+    // Window frame
+    const frameGeometry = new THREE.BoxGeometry(2.1, 1.6, 0.05);
+    const frameMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+    const frame = new THREE.Mesh(frameGeometry, frameMaterial);
+    frame.position.set(2, 1.5, -2.98);
+    scene.add(frame);
+    
+    // Curtains
+    const curtainGeometry = new THREE.PlaneGeometry(1.2, 2);
+    const curtainMaterial = new THREE.MeshLambertMaterial({ color: 0x8B0000 });
+    const leftCurtain = new THREE.Mesh(curtainGeometry, curtainMaterial);
+    leftCurtain.position.set(1.2, 1.5, -2.97);
+    scene.add(leftCurtain);
+    
+    const rightCurtain = new THREE.Mesh(curtainGeometry, curtainMaterial);
+    rightCurtain.position.set(2.8, 1.5, -2.97);
+    scene.add(rightCurtain);
+    
+    // Wall art
+    const artGeometry = new THREE.PlaneGeometry(0.8, 0.6);
+    const artMaterial = new THREE.MeshPhongMaterial({ color: 0x4169E1 });
+    const art = new THREE.Mesh(artGeometry, artMaterial);
+    art.position.set(-2, 1.8, -2.99);
+    scene.add(art);
+    
+    // Picture frame
+    const frameArtGeometry = new THREE.BoxGeometry(0.85, 0.65, 0.03);
+    const frameArt = new THREE.Mesh(frameArtGeometry, frameMaterial);
+    frameArt.position.set(-2, 1.8, -2.98);
+    scene.add(frameArt);
+  };
+
+  const addBedroomElements = (scene: THREE.Scene) => {
+    // Window
+    const windowGeometry = new THREE.PlaneGeometry(1.5, 1.2);
+    const windowMaterial = new THREE.MeshPhongMaterial({ 
+      color: 0x87CEEB,
+      transparent: true,
+      opacity: 0.3,
+      shininess: 100
+    });
+    const window = new THREE.Mesh(windowGeometry, windowMaterial);
+    window.position.set(-3.99, 1.5, -1);
+    window.rotation.y = Math.PI / 2;
+    scene.add(window);
+    
+    // Blinds
+    for (let i = 0; i < 8; i++) {
+      const blindGeometry = new THREE.BoxGeometry(1.5, 0.05, 0.02);
+      const blindMaterial = new THREE.MeshPhongMaterial({ color: 0xF5F5DC });
+      const blind = new THREE.Mesh(blindGeometry, blindMaterial);
+      blind.position.set(-3.98, 1.9 - i * 0.15, -1);
+      blind.rotation.y = Math.PI / 2;
+      scene.add(blind);
+    }
+    
+    // Mirror
+    const mirrorGeometry = new THREE.PlaneGeometry(0.6, 1.2);
+    const mirrorMaterial = new THREE.MeshPhongMaterial({ 
+      color: 0xC0C0C0,
+      shininess: 100,
+      transparent: true,
+      opacity: 0.8
+    });
+    const mirror = new THREE.Mesh(mirrorGeometry, mirrorMaterial);
+    mirror.position.set(3.99, 1.5, 1);
+    mirror.rotation.y = -Math.PI / 2;
+    scene.add(mirror);
+  };
+
+  const addKitchenElements = (scene: THREE.Scene) => {
+    // Upper cabinets
+    const upperCabinetGeometry = new THREE.BoxGeometry(0.6, 0.6, 0.3);
+    const cabinetMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+    
+    for (let i = -3; i <= 3; i += 1.2) {
+      const upperCabinet = new THREE.Mesh(upperCabinetGeometry, cabinetMaterial);
+      upperCabinet.position.set(i, 2.2, -2.85);
+      upperCabinet.castShadow = true;
+      scene.add(upperCabinet);
+    }
+    
+    // Backsplash
+    const backsplashGeometry = new THREE.PlaneGeometry(8, 0.6);
+    const backsplashMaterial = new THREE.MeshPhongMaterial({ 
+      color: 0xF0F8FF,
+      shininess: 50
+    });
+    const backsplash = new THREE.Mesh(backsplashGeometry, backsplashMaterial);
+    backsplash.position.set(0, 1.5, -2.99);
+    scene.add(backsplash);
+    
+    // Kitchen window
+    const windowGeometry = new THREE.PlaneGeometry(1.5, 1);
+    const windowMaterial = new THREE.MeshPhongMaterial({ 
+      color: 0x87CEEB,
+      transparent: true,
+      opacity: 0.3
+    });
+    const window = new THREE.Mesh(windowGeometry, windowMaterial);
+    window.position.set(0, 1.8, -2.99);
+    scene.add(window);
+  };
+
+  const addBathroomElements = (scene: THREE.Scene) => {
+    // Tiles on walls
+    const tileGeometry = new THREE.PlaneGeometry(8, 1.5);
+    const tileMaterial = new THREE.MeshPhongMaterial({ 
+      color: 0xF0F8FF,
+      shininess: 80
+    });
+    const wallTiles = new THREE.Mesh(tileGeometry, tileMaterial);
+    wallTiles.position.set(0, 0.75, -2.99);
+    scene.add(wallTiles);
+    
+    // Mirror above sink
+    const mirrorGeometry = new THREE.PlaneGeometry(1, 0.8);
+    const mirrorMaterial = new THREE.MeshPhongMaterial({ 
+      color: 0xC0C0C0,
+      shininess: 100,
+      transparent: true,
+      opacity: 0.8
+    });
+    const mirror = new THREE.Mesh(mirrorGeometry, mirrorMaterial);
+    mirror.position.set(2, 1.8, -2.99);
+    scene.add(mirror);
+    
+    // Towel rack
+    const rackGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.6);
+    const rackMaterial = new THREE.MeshPhongMaterial({ color: 0xC0C0C0 });
+    const towelRack = new THREE.Mesh(rackGeometry, rackMaterial);
+    towelRack.rotation.z = Math.PI / 2;
+    towelRack.position.set(-2, 1.2, -2.9);
+    scene.add(towelRack);
+    
+    // Towel
+    const towelGeometry = new THREE.PlaneGeometry(0.4, 0.6);
+    const towelMaterial = new THREE.MeshLambertMaterial({ color: 0x00CED1 });
+    const towel = new THREE.Mesh(towelGeometry, towelMaterial);
+    towel.position.set(-2, 1.2, -2.85);
+    scene.add(towel);
+  };
   const addEnhancedLivingRoomFurniture = (scene: THREE.Scene) => {
     // Sofa
     const sofaGroup = new THREE.Group();
@@ -354,6 +626,38 @@ const Scene3D: React.FC<Scene3DProps> = ({ selectedRoom, onObjectClick }) => {
     const screen = new THREE.Mesh(screenGeometry, screenMaterial);
     screen.position.set(0, 1.1, -2.85);
     scene.add(screen);
+
+    // Add plants
+    const plantPotGeometry = new THREE.CylinderGeometry(0.15, 0.2, 0.3);
+    const potMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+    const plantPot = new THREE.Mesh(plantPotGeometry, potMaterial);
+    plantPot.position.set(-3, 0.15, 2);
+    scene.add(plantPot);
+    
+    // Plant leaves
+    const leafGeometry = new THREE.SphereGeometry(0.3);
+    const leafMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+    const plant = new THREE.Mesh(leafGeometry, leafMaterial);
+    plant.position.set(-3, 0.6, 2);
+    scene.add(plant);
+    
+    // Side table
+    const sideTableGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.5);
+    const sideTableMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+    const sideTable = new THREE.Mesh(sideTableGeometry, sideTableMaterial);
+    sideTable.position.set(2.5, 0.25, -1);
+    scene.add(sideTable);
+    
+    // Table lamp
+    const lampBaseGeometry = new THREE.CylinderGeometry(0.08, 0.12, 0.3);
+    const lampBase = new THREE.Mesh(lampBaseGeometry, new THREE.MeshPhongMaterial({ color: 0x2F4F4F }));
+    lampBase.position.set(2.5, 0.65, -1);
+    scene.add(lampBase);
+    
+    const lampShadeGeometry = new THREE.ConeGeometry(0.2, 0.3);
+    const lampShade = new THREE.Mesh(lampShadeGeometry, new THREE.MeshLambertMaterial({ color: 0xFFFACD }));
+    lampShade.position.set(2.5, 0.95, -1);
+    scene.add(lampShade);
   };
 
   const addEnhancedBedroomFurniture = (scene: THREE.Scene) => {
@@ -418,6 +722,50 @@ const Scene3D: React.FC<Scene3DProps> = ({ selectedRoom, onObjectClick }) => {
     wardrobe.position.set(-3, 1, 1);
     wardrobe.castShadow = true;
     scene.add(wardrobe);
+
+    // Add dresser
+    const dresserGeometry = new THREE.BoxGeometry(1.2, 0.8, 0.5);
+    const dresserMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+    const dresser = new THREE.Mesh(dresserGeometry, dresserMaterial);
+    dresser.position.set(3, 0.4, 0);
+    dresser.castShadow = true;
+    scene.add(dresser);
+    
+    // Bedside lamps
+    const lampBaseGeometry = new THREE.CylinderGeometry(0.06, 0.1, 0.25);
+    const lampBaseMaterial = new THREE.MeshPhongMaterial({ color: 0x2F4F4F });
+    
+    const leftLamp = new THREE.Mesh(lampBaseGeometry, lampBaseMaterial);
+    leftLamp.position.set(-1.4, 0.725, -1.8);
+    scene.add(leftLamp);
+    
+    const rightLamp = new THREE.Mesh(lampBaseGeometry, lampBaseMaterial);
+    rightLamp.position.set(1.4, 0.725, -1.8);
+    scene.add(rightLamp);
+    
+    // Lamp shades
+    const shadeGeometry = new THREE.ConeGeometry(0.15, 0.2);
+    const shadeMaterial = new THREE.MeshLambertMaterial({ color: 0xFFFACD });
+    
+    const leftShade = new THREE.Mesh(shadeGeometry, shadeMaterial);
+    leftShade.position.set(-1.4, 0.85, -1.8);
+    scene.add(leftShade);
+    
+    const rightShade = new THREE.Mesh(shadeGeometry, shadeMaterial);
+    rightShade.position.set(1.4, 0.85, -1.8);
+    scene.add(rightShade);
+    
+    // Throw pillows on bed
+    const pillowGeometry = new THREE.BoxGeometry(0.4, 0.1, 0.4);
+    const pillowMaterial = new THREE.MeshLambertMaterial({ color: 0x4169E1 });
+    
+    const pillow1 = new THREE.Mesh(pillowGeometry, pillowMaterial);
+    pillow1.position.set(-0.3, 0.65, -2);
+    scene.add(pillow1);
+    
+    const pillow2 = new THREE.Mesh(pillowGeometry, pillowMaterial);
+    pillow2.position.set(0.3, 0.65, -2);
+    scene.add(pillow2);
   };
 
   const addEnhancedKitchenFurniture = (scene: THREE.Scene) => {
@@ -460,6 +808,27 @@ const Scene3D: React.FC<Scene3DProps> = ({ selectedRoom, onObjectClick }) => {
     fridge.position.set(3, 1, -2.4);
     fridge.castShadow = true;
     scene.add(fridge);
+
+    // Add bar stools
+    const stoolSeatGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.05);
+    const stoolLegGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.6);
+    const stoolMaterial = new THREE.MeshPhongMaterial({ color: 0x2F4F4F });
+    
+    for (let i = -0.5; i <= 0.5; i += 1) {
+      const stoolSeat = new THREE.Mesh(stoolSeatGeometry, stoolMaterial);
+      stoolSeat.position.set(i, 0.625, 0.7);
+      scene.add(stoolSeat);
+      
+      const stoolLeg = new THREE.Mesh(stoolLegGeometry, stoolMaterial);
+      stoolLeg.position.set(i, 0.3, 0.7);
+      scene.add(stoolLeg);
+    }
+    
+    // Kitchen utensils holder
+    const utensilHolderGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.2);
+    const utensilHolder = new THREE.Mesh(utensilHolderGeometry, new THREE.MeshPhongMaterial({ color: 0xC0C0C0 }));
+    utensilHolder.position.set(-1, 0.9, 0);
+    scene.add(utensilHolder);
   };
 
   const addEnhancedBathroomFurniture = (scene: THREE.Scene) => {
@@ -501,6 +870,25 @@ const Scene3D: React.FC<Scene3DProps> = ({ selectedRoom, onObjectClick }) => {
     toilet.position.set(2, 0.4, 1);
     toilet.castShadow = true;
     scene.add(toilet);
+
+    // Add shower curtain
+    const curtainGeometry = new THREE.PlaneGeometry(1.8, 2);
+    const curtainMaterial = new THREE.MeshLambertMaterial({ 
+      color: 0xFFFFFF,
+      transparent: true,
+      opacity: 0.7
+    });
+    const shower = new THREE.Mesh(curtainGeometry, curtainMaterial);
+    shower.position.set(-2, 1, -1.5);
+    scene.add(shower);
+    
+    // Bathroom mat
+    const matGeometry = new THREE.PlaneGeometry(0.8, 0.5);
+    const matMaterial = new THREE.MeshLambertMaterial({ color: 0x00CED1 });
+    const mat = new THREE.Mesh(matGeometry, matMaterial);
+    mat.rotation.x = -Math.PI / 2;
+    mat.position.set(2, 0.01, -2);
+    scene.add(mat);
   };
 
   // Handle window resize
